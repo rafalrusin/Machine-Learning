@@ -1,6 +1,7 @@
 import time
 import random
 import numpy as np
+import matplotlib.pyplot as plt
 np.seterr(all = 'ignore')
 
 # transfer functions
@@ -95,6 +96,8 @@ class MLP_Classifier(object):
         :return: updated activation output vector
         """
         if len(inputs) != self.input-1:
+            print(len(inputs))
+            print(self.input-1)
             raise ValueError('Wrong number of inputs you silly goose!')
 
         # input activations
@@ -102,8 +105,9 @@ class MLP_Classifier(object):
 
         # hidden activations
         sum = np.dot(self.wi.T, self.ai)
-        self.ah = tanh(sum)
-        
+        self.ah = sigmoid(sum)
+        self.ah[self.hidden - 1] = 1. # Hidden bias
+            
         # output activations
         sum = np.dot(self.wo.T, self.ah)
         if self.output_activation == 'logistic':
@@ -142,12 +146,19 @@ class MLP_Classifier(object):
             output_deltas = -(targets - self.ao)
         else:
             raise ValueError('Choose a compatible output layer activation or check your spelling ;-p') 
+
+        #print("Debug")
+        #print(self.ai)
+        #print(self.ah)
+        #print(self.ao)
+        #print(targets)
+        #print(output_deltas)
         
         # calculate error terms for hidden
         # delta (theta) tells you which direction to change the weights
         error = np.dot(self.wo, output_deltas)
-        hidden_deltas = dtanh(self.ah) * error
-        
+        hidden_deltas = dsigmoid(self.ah) * error
+            
         # update the weights connecting hidden to output, change == partial derivative
         change = output_deltas * np.reshape(self.ah, (self.ah.shape[0],1))
         regularization = self.l2_out * self.wo
@@ -187,8 +198,10 @@ class MLP_Classifier(object):
                 
         for i in range(self.iterations):
             error = 0.0
-            random.shuffle(patterns)
-            for p in patterns:
+            patternOrder = list(range(len(patterns)))
+            random.shuffle(patternOrder)
+            for j in patternOrder:
+                p = patterns[j]
                 inputs = p[0]
                 targets = p[1]
                 self.feedForward(inputs)
@@ -200,7 +213,7 @@ class MLP_Classifier(object):
                 
             if i % 10 == 0 and self.verbose == True:
                 error = error/num_example
-                print('Training error %-.5f' % error)
+                print('Training error %i %-.5f' % (i, error))
                 
             # learning rate decay
             self.learning_rate = self.learning_rate * (self.learning_rate / (self.learning_rate + (self.learning_rate * self.rate_decay)))
@@ -229,22 +242,45 @@ def demo():
         data = scale(data)
         
         out = []
+        testout = []
         #print data.shape
 
         # populate the tuple list with the data
         for i in range(data.shape[0]):
             tupledata = list((data[i,:].tolist(), y[i].tolist())) # don't mind this variable name
-            out.append(tupledata)
+            
+            if ((i//10)%2) == 0:
+                out.append(tupledata)
+            else:
+                testout.append(tupledata)
 
-        return out
+        return out, testout
+
+    def load_data2(fn):
+        out = []
+        testout = []
+        i = 0
+        for x in np.arange(0, 1, 0.001):
+            tupledata = [[x], [fn(x)]]
+            if (i%2) == 0:
+                out.append(tupledata)
+            else:
+                testout.append(tupledata)
+            i = i + 1
+
+        return out, testout
+        
+    def testfn1(x):
+        return np.sin((x - 0.3) * np.pi * 3) / 4 + 0.5
     
     start = time.time()
     
-    X = load_data()
+    X,T = load_data2(testfn1)
 
     print(X[9]) # make sure the data looks right
+    print(T[2]) # make sure the data looks right
 
-    NN = MLP_Classifier(64, 4000, 10, iterations = 50, learning_rate = 0.01, 
+    NN = MLP_Classifier(1, 60, 1, iterations = 1000, learning_rate = 0.01, 
                         momentum = 0.5, rate_decay = 0.0001, 
                         output_layer = 'logistic')
 
@@ -252,8 +288,44 @@ def demo():
     
     end = time.time()
     print(end - start)
+    print("finished")
     
     #NN.test(X)
+
+    overallErrorSqr, overallErrorN = 0, 0
+    
+    for t in T:
+        p = NN.predict([t[0]])
+        #print("t[1]: " + str(t[1]) + ", p: " + str(p[0]))
+        
+        errorSqr, errorN = 0, 0
+        for j in range(0, 1):
+            #print(j)
+            errorSqr = errorSqr + (p[0][j] - t[1][j]) ** 2
+            errorN = errorN + 1
+
+        error = errorSqr ** 0.5 / errorN
+        #print("Error for p: " + str(p[0]) + ", t: " + str(t[1]) + " = " + str(error))
+
+        overallErrorSqr = overallErrorSqr + error ** 2
+        overallErrorN = overallErrorN + 1
+
+    overallError = overallErrorSqr ** 0.5 / overallErrorN
+    print("overallError: " + str(overallError))
+    if overallError > 0.001:
+        print("Too big error")
+
+    x = []
+    y = []
+    z = []
+    for t in T:
+        x.append(t[0])
+        y.append(t[1])
+        z.append(NN.predict([t[0]])[0])
+    plt.plot(x, y, 'r--')
+    plt.plot(x, z)
+    plt.show()
+        
 
 if __name__ == '__main__':
     demo()

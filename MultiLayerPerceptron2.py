@@ -187,7 +187,7 @@ class MLP_Classifier(object):
                 
         for i in range(self.iterations):
             error = 0.0
-            random.shuffle(patterns)
+            #random.shuffle(patterns)
             for p in patterns:
                 inputs = p[0]
                 targets = p[1]
@@ -229,22 +229,28 @@ def demo():
         data = scale(data)
         
         out = []
+        testout = []
         #print data.shape
 
         # populate the tuple list with the data
         for i in range(data.shape[0]):
             tupledata = list((data[i,:].tolist(), y[i].tolist())) # don't mind this variable name
-            out.append(tupledata)
+            
+            if ((i//10)%2) == 0:
+                out.append(tupledata)
+            else:
+                testout.append(tupledata)
 
-        return out
+        return out, testout
     
     start = time.time()
     
-    X = load_data()
+    X,T = load_data()
 
     print(X[9]) # make sure the data looks right
+    print(T[2]) # make sure the data looks right
 
-    NN = MLP_Classifier(64, 4000, 10, iterations = 50, learning_rate = 0.01, 
+    NN = MLP_Classifier(64, 30, 10, iterations = 20, learning_rate = 0.01, 
                         momentum = 0.5, rate_decay = 0.0001, 
                         output_layer = 'logistic')
 
@@ -252,8 +258,32 @@ def demo():
     
     end = time.time()
     print(end - start)
+    print("finished")
     
     #NN.test(X)
+
+    overallErrorSqr, overallErrorN = 0, 0
+    
+    for t in T:
+        p = NN.predict([t[0]])
+        #print("t[1]: " + str(t[1]) + ", p: " + str(p[0]))
+        
+        errorSqr, errorN = 0, 0
+        for j in range(0, 10):
+            #print(j)
+            errorSqr = errorSqr + (p[0][j] - t[1][j]) ** 2
+            errorN = errorN + 1
+
+        error = errorSqr ** 0.5 / errorN
+        #print("Error for p: " + str(p[0]) + ", t: " + str(t[1]) + " = " + str(error))
+
+        overallErrorSqr = overallErrorSqr + error ** 2
+        overallErrorN = overallErrorN + 1
+
+    overallError = overallErrorSqr ** 0.5 / overallErrorN
+    print("overallError: " + str(overallError))
+    if overallError > 0.001:
+        print("Too big error")
 
 if __name__ == '__main__':
     demo()
