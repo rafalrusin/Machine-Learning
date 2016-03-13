@@ -332,7 +332,10 @@ def demo():
     def animate(v):
         print(v)
 
-        NN.fit(X)
+        if v < 20:
+            time.sleep(1)
+        else:
+            NN.fit(X)
         
         z = []
         for t in T:
